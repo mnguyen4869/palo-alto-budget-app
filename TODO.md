@@ -16,7 +16,7 @@ Building a smart financial coach that uses AI to transform transaction data into
 - [ ] Implement JWT authentication with OAuth2
 - [ ] Build REST API endpoints for:
   - [ ] User registration/login
-  - [ ] Bank account linking
+  - [ ] Bank account linking, keep in mind this dos not need 
   - [ ] Transaction retrieval
   - [ ] Goal management
   - [ ] Insights generation
@@ -25,11 +25,11 @@ Building a smart financial coach that uses AI to transform transaction data into
 - [ ] Initialize React project with Vite
 - [ ] Set up component structure and routing
 - [ ] Implement authentication UI (login/register)
-- [ ] Integrate Plaid Link component for bank connections
 - [ ] Create dashboard with data visualizations using Recharts/Chart.js
 - [ ] Build transaction categorization interface
 - [ ] Implement goal tracking and forecasting UI
 - [ ] Design subscription management interface
+- [ ] Integrate Plaid Link component for bank connections
 
 ### 3. AI & Analytics Features
 - [ ] Implement intelligent spending insights using Pandas
