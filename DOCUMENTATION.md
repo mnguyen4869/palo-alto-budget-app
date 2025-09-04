@@ -24,7 +24,9 @@
 
 ## Design Choices
 
-### Architecture
+### Outline
+A more broad description of the outline of the project can be found
+[here](/outline.md).
 
 ### Architecture Justification
 
@@ -68,8 +70,6 @@ project.
 
 ## AI/ML Features and Tooling
 
-### AI Tooling
-
 ### Financial Insights Engine
 - **Spending Pattern Analysis** - Identifies trends and habits
 - **Anomaly Detection** - Uses IsolationForest to flag unusual transactions
@@ -77,10 +77,18 @@ project.
 - **Income Stream Analysis** - Tracks and categorizes income sources
 - **Budget Recommendations** - Suggests spending limits by category
 
-### Goal Forecasting Engine
-- **Trend Analysis** - Projects future savings based on history
-- **Goal Feasibility** - Assesses achievability of financial goals
-- **Milestone Tracking** - Breaks down goals into achievable steps
+We used an IsolationForest as the main ML component to detect abnormalities as
+it fits our situation perfectly. It works well on a small amount of data and is
+done completely locally so we don't have any privacy concerns like we do if we
+reach out to a third-party API. So, we can have a powerful local ML model with just
+user data, which doesn't need to be shared.
+
+### AI Tooling
+Claude Code was used to help accelerate the pace of the project, but before it
+was used, an outline was drafted up. This outline contained the design for the
+system and was created by myself with some back and forth from Gemini. This
+gave the basis for the rest of the project and provided a guideline for it
+besides just the case challenge prompt.
 
 ## Security Implementation
 
@@ -129,13 +137,4 @@ project.
 - Advanced portfolio optimization
 - Natural language financial assistant
 - Collaborative filtering for peer comparisons
-
-### Additional Features
-- Multi-currency support
-- Family/shared account management
-- Tax optimization suggestions
-- Automated savings rules
-- Financial education content
-- Mobile application
-- Export to accounting software
 
