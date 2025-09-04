@@ -14,21 +14,59 @@ const PlaidLink: React.FC<PlaidLinkProps> = ({ onSuccess, className = '' }) => {
   const [error, setError] = useState<string | null>(null)
 
   const onSuccessCallback = useCallback(
-    async (public_token: string, metadata: any) => {
+    async (public_token: string) => {
       try {
-        const response = await fetch('http://localhost:8000/plaid/exchange_token', {
+        const response = await fetch(`http://localhost:8000/plaid/exchange_token?public_token=${encodeURIComponent(public_token)}`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ public_token }),
         })
 
         if (response.ok) {
+          // Automatically sync transactions after connecting bank account
+          try {
+            const syncResponse = await fetch('http://localhost:8000/plaid/transactions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            })
+            
+            if (syncResponse.ok) {
+              console.log('Automatic transaction sync completed successfully')
+              
+              // Also sync income data
+              try {
+                const incomeResponse = await fetch('http://localhost:8000/plaid/income', {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                })
+                
+                if (incomeResponse.ok) {
+                  console.log('Automatic income sync completed successfully')
+                } else {
+                  console.warn('Automatic income sync failed, but transactions were synced')
+                }
+              } catch (incomeError) {
+                console.warn('Automatic income sync error:', incomeError)
+              }
+            } else {
+              console.warn('Automatic transaction sync failed, but account was connected')
+            }
+          } catch (syncError) {
+            console.warn('Automatic sync error, but account was connected:', syncError)
+          }
+          
           onSuccess()
         } else {
-          setError('Failed to connect bank account')
+          const errorData = await response.json()
+          setError(errorData.detail || 'Failed to connect bank account')
         }
       } catch (error) {
         setError('Failed to connect bank account')
@@ -37,11 +75,11 @@ const PlaidLink: React.FC<PlaidLinkProps> = ({ onSuccess, className = '' }) => {
     [token, onSuccess]
   )
 
-  const onEventCallback = useCallback((eventName: string, metadata: any) => {
-    console.log('Plaid Link event:', eventName, metadata)
+  const onEventCallback = useCallback((eventName: string) => {
+    console.log('Plaid Link event:', eventName)
   }, [])
 
-  const onExitCallback = useCallback((err: any, metadata: any) => {
+  const onExitCallback = useCallback((err: any) => {
     if (err) {
       console.error('Plaid Link error:', err)
       setError('Bank connection was cancelled or failed')
@@ -99,9 +137,9 @@ const PlaidLink: React.FC<PlaidLinkProps> = ({ onSuccess, className = '' }) => {
     <div>
       <button
         onClick={handleClick}
-        disabled={loading || (!ready && linkToken)}
+        disabled={loading || (!ready && linkToken !== null)}
         className={`${className} ${
-          loading || (!ready && linkToken)
+          loading || (!ready && linkToken !== null)
             ? 'opacity-50 cursor-not-allowed'
             : 'hover:bg-orange-700'
         }`}

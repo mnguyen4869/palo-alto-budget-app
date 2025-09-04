@@ -1,14 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-
-interface Transaction {
-  id: string
-  name: string
-  price: number
-  categories: string[]
-  merchant_name: string
-  transaction_date: string
-}
+import type { Transaction } from '../types/transaction'
+import type { Insight } from '../types/insight'
 
 interface Goal {
   id: string
@@ -20,14 +13,39 @@ interface Goal {
   status: 'active' | 'completed' | 'paused'
 }
 
-interface Insight {
+
+interface BankAccount {
   id: string
-  title: string
-  message: string
-  insight_type: string
-  confidence_score: number
-  is_read: boolean
+  account_name: string
+  account_type: string
+  account_subtype: string
+  institution_name: string
+  mask: string
+  is_active: boolean
   created_at: string
+}
+
+interface IncomeStream {
+  account_id: string
+  account_name: string
+  name: string
+  monthly_income: number
+  confidence: number
+  days_available: number
+  frequency: string
+}
+
+interface IncomeData {
+  message: string
+  income_streams: IncomeStream[]
+  total_monthly_income: number
+  stream_count: number
+}
+
+interface SyncResult {
+  message: string
+  transaction_count?: number
+  status: string
 }
 
 export const useTransactions = () => {
@@ -139,4 +157,144 @@ export const useInsights = () => {
   }, [token])
 
   return { insights, loading, error, setInsights }
+}
+
+export const useBankAccounts = () => {
+  const { token } = useAuth()
+  const [accounts, setAccounts] = useState<BankAccount[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchAccounts = async () => {
+    if (!token) return
+
+    try {
+      setLoading(true)
+      const response = await fetch('http://localhost:8000/accounts', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setAccounts(data)
+        setError(null)
+      } else {
+        setError('Failed to fetch bank accounts')
+      }
+    } catch (error) {
+      setError('Failed to fetch bank accounts')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchAccounts()
+  }, [token])
+
+  const removeAccount = async (accountId: string): Promise<void> => {
+    if (!token) throw new Error('No authentication token')
+
+    const response = await fetch(`http://localhost:8000/accounts/${accountId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.detail || 'Failed to remove bank account')
+    }
+
+    // Refresh accounts list after successful removal
+    await fetchAccounts()
+  }
+
+  return { accounts, loading, error, refetch: fetchAccounts, removeAccount }
+}
+
+export const usePlaidSync = () => {
+  const { token } = useAuth()
+
+  const syncTransactions = async (): Promise<SyncResult> => {
+    if (!token) throw new Error('No authentication token')
+
+    const response = await fetch('http://localhost:8000/plaid/transactions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.detail || 'Failed to sync transactions')
+    }
+
+    return response.json()
+  }
+
+  const syncIncome = async (): Promise<IncomeData> => {
+    if (!token) throw new Error('No authentication token')
+
+    const response = await fetch('http://localhost:8000/plaid/income', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.detail || 'Failed to sync income data')
+    }
+
+    return response.json()
+  }
+
+  return { syncTransactions, syncIncome }
+}
+
+export const useIncomeData = () => {
+  const { token } = useAuth()
+  const [incomeData, setIncomeData] = useState<IncomeData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchIncomeData = async () => {
+    if (!token) return
+
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch('http://localhost:8000/income/analysis', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setIncomeData(data)
+      } else {
+        const errorData = await response.json()
+        setError(errorData.detail || 'Failed to fetch income data')
+      }
+    } catch (error) {
+      setError('Failed to fetch income data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return { incomeData, loading, error, fetchIncomeData }
 }

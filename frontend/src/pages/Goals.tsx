@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { useGoals, useTransactions } from '../hooks/useApi'
+import { useGoals, useTransactions, useInsights } from '../hooks/useApi'
+import InsightCard from '../components/InsightCard'
 
 interface Goal {
   id: string
@@ -16,8 +17,10 @@ const Goals: React.FC = () => {
   const { token } = useAuth()
   const { goals, loading, error, setGoals } = useGoals()
   const { transactions } = useTransactions()
+  const { insights } = useInsights()
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
+  const [expandedInsights, setExpandedInsights] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -132,12 +135,12 @@ const Goals: React.FC = () => {
     if (goal.current_amount >= goal.target_amount) return 'Goal completed!'
     
     const monthlyIncome = transactions
-      .filter(t => t.price > 0)
-      .reduce((sum, t) => sum + t.price, 0) / Math.max(transactions.length / 30, 1)
+      .filter(t => Number(t.price) < 0)  // Income is negative in Plaid API
+      .reduce((sum, t) => sum + Math.abs(Number(t.price)), 0) / Math.max(transactions.length / 30, 1)
 
     const monthlyExpenses = transactions
-      .filter(t => t.price < 0)
-      .reduce((sum, t) => sum + Math.abs(t.price), 0) / Math.max(transactions.length / 30, 1)
+      .filter(t => Number(t.price) > 0)  // Expenses are positive in Plaid API
+      .reduce((sum, t) => sum + Number(t.price), 0) / Math.max(transactions.length / 30, 1)
 
     const monthlySavings = monthlyIncome - monthlyExpenses
     const remainingAmount = goal.target_amount - goal.current_amount
@@ -171,6 +174,24 @@ const Goals: React.FC = () => {
       month: 'long',
       day: 'numeric'
     })
+  }
+
+  const getSavingInsights = () => {
+    // Filter insights that can help with saving money
+    const savingInsightTypes = [
+      'category_analysis',
+      'subscription_summary',
+      'gray_charges',
+      'delivery_spending',
+      'coffee_spending',
+      'spending_increase',
+      'weekend_spending'
+    ]
+    
+    return insights.filter(insight => 
+      savingInsightTypes.includes(insight.insight_type) && 
+      insight.confidence_score > 0.6
+    ).slice(0, 3) // Show top 3 most relevant
   }
 
   if (loading) {
@@ -380,6 +401,101 @@ const Goals: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Expandable Money-Saving Insights */}
+      {getSavingInsights().length > 0 && goals.length > 0 && (
+        <div className="mt-8">
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+            {/* Header */}
+            <div className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="bg-green-100 p-1.5 rounded-lg">
+                    <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  </div>
+                  <div className="ml-2">
+                    <h3 className="text-sm font-semibold text-gray-900">💡 Quick Saving Tips</h3>
+                    <p className="text-xs text-gray-600">
+                      {expandedInsights ? 'All personalized insights' : `${getSavingInsights().length} insights to accelerate your goals`}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setExpandedInsights(!expandedInsights)}
+                    className="text-green-600 hover:text-green-700 text-xs font-medium border border-green-300 hover:border-green-400 px-2 py-1 rounded transition-colors"
+                  >
+                    {expandedInsights ? 'Collapse' : 'Expand All'}
+                  </button>
+                  <button
+                    onClick={() => window.open('/insights', '_blank')}
+                    className="text-green-600 hover:text-green-700 text-xs font-medium px-2 py-1 rounded transition-colors"
+                  >
+                    View Details →
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            {/* Content */}
+            <div className="px-4 pb-4">
+              {!expandedInsights ? (
+                /* Collapsed View - Show 2 compact insights */
+                <div className="space-y-2">
+                  {getSavingInsights().slice(0, 2).map(insight => (
+                    <div key={insight.id} className="bg-white rounded-md border border-gray-200 p-3">
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0 w-6 h-6 bg-green-100 text-green-700 text-xs font-bold rounded-full flex items-center justify-center mr-3 mt-0.5">
+                          {insight.insight_type === 'category_analysis' ? '📊' : 
+                           insight.title.includes('Coffee') ? '☕' : 
+                           insight.title.includes('Delivery') ? '🚚' : '💰'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs font-medium text-gray-900 mb-1">{insight.title}</h4>
+                          <p className="text-xs text-gray-600 line-clamp-2">
+                            {insight.insight_type === 'category_analysis' 
+                              ? insight.message.split('\n')[0] 
+                              : insight.message.length > 120 
+                                ? insight.message.substring(0, 120) + '...'
+                                : insight.message}
+                          </p>
+                          <div className="mt-2">
+                            <span className="text-xs text-gray-500">
+                              {Math.round(insight.confidence_score * 100)}% confidence
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {getSavingInsights().length > 2 && (
+                    <div className="text-center pt-2">
+                      <span className="text-xs text-gray-500">
+                        +{getSavingInsights().length - 2} more insights available
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Expanded View - Show all insights with full text using InsightCard */
+                <div className="space-y-3">
+                  {getSavingInsights().map(insight => (
+                    <div key={insight.id} className="bg-white rounded-md border border-gray-200 overflow-hidden">
+                      <InsightCard 
+                        insight={insight} 
+                        variant="green" 
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

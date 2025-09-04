@@ -1,34 +1,31 @@
 import React, { useState, useMemo } from 'react'
-import { useTransactions } from '../hooks/useApi'
-
-interface Transaction {
-  id: string
-  name: string
-  price: number
-  categories: string[]
-  merchant_name: string
-  transaction_date: string
-}
+import { useTransactions, usePlaidSync } from '../hooks/useApi'
+import { parseDetailedCategory } from '../utils/categoryUtils'
 
 const Transactions: React.FC = () => {
   const { transactions, loading, error } = useTransactions()
+  const { syncTransactions } = usePlaidSync()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'name'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [transactionType, setTransactionType] = useState<'all' | 'income' | 'expense'>('all')
+  const [syncing, setSyncing] = useState(false)
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
 
   const filteredAndSortedTransactions = useMemo(() => {
     let filtered = transactions.filter(transaction => {
       const matchesSearch = transaction.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          transaction.merchant_name.toLowerCase().includes(searchTerm.toLowerCase())
+                          (transaction.merchant_name && transaction.merchant_name.toLowerCase().includes(searchTerm.toLowerCase()))
       
+      const transactionCategory = parseDetailedCategory(transaction.category_primary, transaction.category_detailed)
       const matchesCategory = selectedCategory === '' || 
-                            transaction.categories.some(cat => cat.toLowerCase().includes(selectedCategory.toLowerCase()))
+                            (selectedCategory === 'no_categories' && !transaction.category_primary && !transaction.category_detailed) ||
+                            (transactionCategory && transactionCategory === selectedCategory)
       
       const matchesType = transactionType === 'all' ||
-                         (transactionType === 'income' && transaction.price > 0) ||
-                         (transactionType === 'expense' && transaction.price < 0)
+                         (transactionType === 'income' && Number(transaction.price) < 0) ||
+                         (transactionType === 'expense' && Number(transaction.price) > 0)
 
       return matchesSearch && matchesCategory && matchesType
     })
@@ -38,10 +35,10 @@ const Transactions: React.FC = () => {
       
       switch (sortBy) {
         case 'date':
-          comparison = new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime()
+          comparison = new Date(a.date_of_transaction).getTime() - new Date(b.date_of_transaction).getTime()
           break
         case 'amount':
-          comparison = Math.abs(a.price) - Math.abs(b.price)
+          comparison = Math.abs(Number(a.price)) - Math.abs(Number(b.price))
           break
         case 'name':
           comparison = a.name.localeCompare(b.name)
@@ -57,18 +54,40 @@ const Transactions: React.FC = () => {
   const allCategories = useMemo(() => {
     const categories = new Set<string>()
     transactions.forEach(transaction => {
-      transaction.categories.forEach(category => {
-        categories.add(category.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()))
-      })
+      const parsedCategory = parseDetailedCategory(transaction.category_primary, transaction.category_detailed)
+      if (parsedCategory) {
+        categories.add(parsedCategory)
+      }
     })
     return Array.from(categories).sort()
   }, [transactions])
+
+  const handleSyncTransactions = async () => {
+    try {
+      setSyncing(true)
+      setSyncMessage('Syncing transactions from your connected accounts...')
+      const result = await syncTransactions()
+      setSyncMessage(`Success! ${result.transaction_count || 0} new transactions synced.`)
+      
+      // Refresh transactions by calling the hook's refetch function
+      setTimeout(() => {
+        window.location.reload() // Simple refresh for now
+      }, 2000)
+      
+      setTimeout(() => setSyncMessage(null), 5000)
+    } catch (error: any) {
+      setSyncMessage(`Sync failed: ${error.message}`)
+      setTimeout(() => setSyncMessage(null), 5000)
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
-    }).format(Math.abs(amount))
+    }).format(amount)  // Don't use Math.abs here, let the caller handle sign
   }
 
   const formatDate = (dateString: string) => {
@@ -112,8 +131,35 @@ const Transactions: React.FC = () => {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Transactions</h1>
-        <p className="text-gray-600">View and categorize your financial transactions</p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Transactions</h1>
+            <p className="text-gray-600">View and categorize your financial transactions</p>
+          </div>
+          <button
+            onClick={handleSyncTransactions}
+            disabled={syncing}
+            className={`px-4 py-2 rounded-md font-medium text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+              syncing 
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            {syncing ? 'Syncing...' : 'Sync from Plaid'}
+          </button>
+        </div>
+        
+        {syncMessage && (
+          <div className={`mt-4 p-3 rounded ${
+            syncMessage.includes('Success') || syncMessage.includes('synced')
+              ? 'bg-green-100 border border-green-400 text-green-700'
+              : syncMessage.includes('failed') || syncMessage.includes('Sync failed')
+              ? 'bg-red-100 border border-red-400 text-red-700'
+              : 'bg-blue-100 border border-blue-400 text-blue-700'
+          }`}>
+            {syncMessage}
+          </div>
+        )}
       </div>
 
       {/* Filters and Search */}
@@ -138,6 +184,7 @@ const Transactions: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
             >
               <option value="">All Categories</option>
+              <option value="no_categories">No Categories</option>
               {allCategories.map(category => (
                 <option key={category} value={category}>{category}</option>
               ))}
@@ -194,13 +241,13 @@ const Transactions: React.FC = () => {
           <div>
             <p className="text-sm text-gray-600">Total Income</p>
             <p className="text-2xl font-semibold text-green-600">
-              {formatCurrency(filteredAndSortedTransactions.filter(t => t.price > 0).reduce((sum, t) => sum + t.price, 0))}
+              {formatCurrency(filteredAndSortedTransactions.filter(t => Number(t.price) < 0).reduce((sum, t) => sum + Math.abs(Number(t.price)), 0))}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Total Expenses</p>
             <p className="text-2xl font-semibold text-red-600">
-              {formatCurrency(filteredAndSortedTransactions.filter(t => t.price < 0).reduce((sum, t) => sum + Math.abs(t.price), 0))}
+              {formatCurrency(filteredAndSortedTransactions.filter(t => Number(t.price) > 0).reduce((sum, t) => sum + Number(t.price), 0))}
             </p>
           </div>
         </div>
@@ -235,29 +282,56 @@ const Transactions: React.FC = () => {
                 {filteredAndSortedTransactions.map((transaction) => (
                   <tr key={transaction.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{transaction.name}</div>
-                        <div className="text-sm text-gray-500">{transaction.merchant_name}</div>
+                      <div className="flex items-center">
+                        {transaction.logo_url && (
+                          <img
+                            src={transaction.logo_url}
+                            alt={`${transaction.merchant_name} logo`}
+                            className="w-8 h-8 rounded-full mr-3 object-contain bg-gray-100"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none'
+                            }}
+                          />
+                        )}
+                        <div>
+                          <div 
+                            className="text-sm font-medium text-gray-900" 
+                            title={transaction.name.length > 30 ? transaction.name : undefined}
+                          >
+                            {transaction.name.length > 30 ? `${transaction.name.substring(0, 30)}...` : transaction.name}
+                          </div>
+                          <div 
+                            className="text-sm text-gray-500" 
+                            title={(transaction.merchant_name?.length || 0) > 30 ? transaction.merchant_name : undefined}
+                          >
+                            {transaction.merchant_name 
+                              ? (transaction.merchant_name.length > 30 
+                                  ? `${transaction.merchant_name.substring(0, 30)}...` 
+                                  : transaction.merchant_name)
+                              : 'Unknown Merchant'}
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-wrap gap-1">
-                        {transaction.categories.map((category, index) => (
+                        {(transaction.category_primary || transaction.category_detailed) ? (
                           <span
-                            key={index}
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryBadgeColor(category)}`}
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryBadgeColor(transaction.category_primary || transaction.category_detailed || '')}`}
                           >
-                            {category.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            {parseDetailedCategory(transaction.category_primary, transaction.category_detailed)}
                           </span>
-                        ))}
+                        ) : (
+                          <span className="text-sm text-gray-400 italic">No categories</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(transaction.transaction_date)}
+                      {formatDate(transaction.date_of_transaction)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <span className={`text-sm font-medium ${transaction.price > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {transaction.price > 0 ? '+' : '-'}{formatCurrency(transaction.price)}
+                      <span className={`text-sm font-medium ${Number(transaction.price) < 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {Number(transaction.price) < 0 ? '+' : '-'}{formatCurrency(Math.abs(Number(transaction.price)))}
                       </span>
                     </td>
                   </tr>

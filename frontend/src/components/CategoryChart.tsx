@@ -7,15 +7,8 @@ import {
   Tooltip,
   Legend
 } from 'recharts'
-
-interface Transaction {
-  id: string
-  name: string
-  price: number
-  categories: string[]
-  merchant_name: string
-  transaction_date: string
-}
+import { formatCategoryName } from '../utils/categoryUtils'
+import type { Transaction } from '../types/transaction'
 
 interface CategoryChartProps {
   transactions: Transaction[]
@@ -27,15 +20,29 @@ const COLORS = [
 ]
 
 const CategoryChart: React.FC<CategoryChartProps> = ({ transactions }) => {
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload
+      return (
+        <div className="bg-white p-3 border border-gray-300 rounded-lg shadow-lg">
+          <p className="font-semibold text-gray-900">{data.name}</p>
+          <p className="text-gray-600">
+            <span className="text-green-600 font-medium">${data.value.toLocaleString()}</span>
+          </p>
+        </div>
+      )
+    }
+    return null
+  }
   const processCategoryData = () => {
     const categorySpending: { [key: string]: number } = {}
     
     transactions.forEach(transaction => {
-      if (transaction.price < 0) {
-        transaction.categories.forEach(category => {
-          const cleanCategory = category.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
-          categorySpending[cleanCategory] = (categorySpending[cleanCategory] || 0) + Math.abs(transaction.price)
-        })
+      if (Number(transaction.price) > 0) {
+        const category = formatCategoryName(transaction.category_primary)
+        if (category) {
+          categorySpending[category] = (categorySpending[category] || 0) + Number(transaction.price)
+        }
       }
     })
 
@@ -62,29 +69,34 @@ const CategoryChart: React.FC<CategoryChartProps> = ({ transactions }) => {
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <h3 className="text-lg font-semibold mb-4">Spending by Category</h3>
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={400}>
         <PieChart>
           <Pie
             data={categoryData}
-            cx="50%"
+            cx="40%"
             cy="50%"
             labelLine={false}
-            outerRadius={80}
+            outerRadius={120}
             fill="#8884d8"
             dataKey="value"
-            label={({ name, percent }) => 
-              `${name}: ${(percent * 100).toFixed(0)}%`
-            }
           >
-            {categoryData.map((entry, index) => (
+            {categoryData.map((_, index) => (
               <Cell 
                 key={`cell-${index}`} 
                 fill={COLORS[index % COLORS.length]} 
               />
             ))}
           </Pie>
-          <Tooltip formatter={(value) => [`$${value}`, 'Amount']} />
-          <Legend />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend 
+            verticalAlign="top" 
+            align="right" 
+            layout="vertical"
+            wrapperStyle={{
+              paddingLeft: '20px',
+              fontSize: '14px'
+            }}
+          />
         </PieChart>
       </ResponsiveContainer>
     </div>

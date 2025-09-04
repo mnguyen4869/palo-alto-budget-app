@@ -7,6 +7,8 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Transactions from './pages/Transactions'
+import Subscriptions from './pages/Subscriptions'
+import Insights from './pages/Insights'
 import Goals from './pages/Goals'
 import Settings from './pages/Settings'
 import './App.css'
@@ -33,6 +35,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Transactions />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/subscriptions" 
+              element={
+                <ProtectedRoute>
+                  <Subscriptions />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/insights" 
+              element={
+                <ProtectedRoute>
+                  <Insights />
                 </ProtectedRoute>
               } 
             />

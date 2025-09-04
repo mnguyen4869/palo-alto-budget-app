@@ -1,68 +1,45 @@
-Project Outline: FinTech Financial Visibility App
-## Frontend (Web App)
-Technology: React.js (using Vite)
+#### **1. Frontend (Web App)**
 
-Justification:
+* **Technology:** **React.js (using Vite)**
+* **Justification:**
+    * **Rapid Development:** Vite provides an extremely fast development server and build process, allowing for instant feedback on UI changes, which is crucial in a hackathon setting.
+    * **Modern UI/UX:** React's component-based architecture and vast ecosystem of libraries (like `Recharts` for charts or Material-UI for components) allow you to quickly build a polished, interactive dashboard that directly addresses the "Financial Visibility" success metric.
+    * **Seamless API Integration:** React is excellent at consuming data from REST APIs, making it straightforward to connect to the FastAPI backend.
+    * **Plaid Web Support:** Plaid provides an official React component (`Plaid Link`) that handles the entire secure bank connection flow out of the box.
 
-Rapid Prototyping: Vite provides an extremely fast development server and build process, which is a massive advantage in a time-constrained hackathon.
+#### **2. Backend (API & AI Logic)**
 
-Rich Ecosystem & Reusability: React's component-based architecture allows you to build the UI in modular, reusable pieces. You can leverage powerful, pre-built UI libraries like Material-UI or Ant Design to create a professional-looking interface quickly.
+* **Technology:** **Python with FastAPI**
+* **Justification:**
+    * **Unified Codebase:** This is the primary advantage. Your core API logic and your AI/machine learning models (using libraries like Pandas and Scikit-learn) live in the same application. This eliminates the need for a separate microservice, radically simplifying development, testing, and deployment.
+    * **High Performance:** FastAPI is one of the fastest web frameworks available for Python, delivering performance comparable to Node.js, ensuring your application feels responsive.
+    * **Automatic Interactive Docs:** FastAPI automatically generates interactive API documentation (Swagger UI). This is a massive time-saver, as it allows the frontend to see and test every endpoint without any extra work.
+    * **Built-in Data Validation:** By using Python type hints, FastAPI automatically validates incoming data, which helps prevent bugs and improves the overall security and reliability of your application.
+    * **Direct AI Integration:** You can directly import `Pandas` and `Scikit-learn` to perform trend analysis, anomaly detection, and subscription identification right within your API endpoints, perfectly fulfilling the "AI Application" success metric.
 
-Powerful Data Visualization: To address the "Financial Visibility" success metric, you can easily integrate robust charting libraries like Recharts or Chart.js to build the required dashboards and spending breakdowns.
+#### **3. Database**
 
-Seamless API Integration: React is designed to work perfectly with REST APIs, making it straightforward to fetch and display data from the new FastAPI backend.
+* **Technology:** **SQLite**
+* **Justification:**
+    * **Ultimate Simplicity:** SQLite is a serverless, file-based database. There is **zero configuration** required—it's just a file in your project directory. This is the fastest and easiest way to get a database running for a hackathon.
+    * **Perfect for an MVP:** For a prototype and demo, SQLite is more than capable of handling the data for a handful of users. It removes the complexity of managing a separate database server.
+    * **Excellent Python Support:** Python has a built-in `sqlite3` module, and SQLite integrates seamlessly with popular Python ORMs like **SQLAlchemy** (which is highly recommended with FastAPI) for structured and safe database queries.
+    * **Portability:** The entire application, including the database, is self-contained, making it incredibly easy to run on any machine.
 
-Plaid Web Support: Plaid's Plaid Link module is a pre-built React component that can be dropped directly into your application, securely handling the entire bank connection flow.
+#### **4. Third-Party Service for Bank Integration**
 
-## Backend (Server & API)
-Technology: Python with FastAPI
+* **Technology:** **Plaid API**
+* **Justification:**
+    * **Core Functionality:** Securely connecting to bank accounts is a non-negotiable feature that is too complex to build in a hackathon. Plaid is the industry standard.
+    * **Trust and Security:** Plaid handles all sensitive credential management through tokenization. Your application never sees or stores user bank passwords, which is a massive win for the "Trust and Security" metric.
+    * **Clean Data:** Plaid provides cleaned and categorized transaction data, giving your AI models a great starting point for analysis.
+    * **Free Sandbox:** Plaid offers a full-featured sandbox environment for development, allowing you to build and test your entire application with realistic fake data.
 
-Justification:
+#### **5. Deployment**
 
-Performance: FastAPI is built on ASGI (Asynchronous Server Gateway Interface) and is one of the fastest Python web frameworks, capable of handling a large number of concurrent requests.
-
-Data Science Synergy: By using Python, you can natively leverage libraries like Pandas, Scikit-learn, and others directly in your API code without needing a separate microservice. This simplifies the architecture and reduces complexity.
-
-Automatic Documentation: FastAPI automatically generates interactive API documentation with Swagger UI, which is invaluable for a hackathon setting. This makes it easy to test endpoints and collaborate with frontend developers.
-
-Type Safety: FastAPI enforces type hints using Pydantic, which helps prevent common data-related bugs and makes the API easier to use and maintain.
-
-## Database
-Technology: SQLite
-
-Justification:
-
-Zero-Configuration: SQLite is a serverless, file-based database. This eliminates the need for a separate database server, saving significant setup time.
-
-Simplicity & Speed: It's built into Python's standard library and is incredibly fast for local development and prototyping, which aligns perfectly with a hackathon's velocity requirements.
-
-No Network Latency: All database operations are handled directly on the local file system, removing any network latency that would be introduced by a separate database server.
-
-## API & Authentication
-Plaid API: Continue to use the Plaid API for secure access to user financial data.
-
-Authentication: Implement a secure authentication system using JSON Web Tokens (JWT) and OAuth2 with FastAPI. This is a standard and secure method for managing user sessions and protecting API endpoints.
-
-## Core Logic (AI & Analytics)
-Technology: Python Libraries (Pandas, Scikit-learn)
-
-Justification:
-
-Pandas: A powerful and flexible library for data manipulation and analysis. It's perfect for ingesting, cleaning, and manipulating the transaction data pulled from Plaid.
-
-Scikit-learn: A comprehensive library for implementing the core AI features like anomaly detection and forecasting.
-
-Task Implementation: Use Scikit-learn for IsolationForest to identify spending anomalies, classification models to refine transaction categories, and rule-based methods to detect subscriptions and "Gray Charges."
-
-## Deployment
-Technology: Render
-
-Justification:
-
-Simplicity and Speed: Render is a Platform-as-a-Service (PaaS) provider that allows you to deploy your application with a simple git push.
-
-Free Tiers: It offers a generous free tier that is more than sufficient for a hackathon prototype.
-
-Add-ons: Render can easily handle both the FastAPI backend and a simple file-based SQLite database.
-
-Polyglot Support: Render can host both the Python/FastAPI backend and the React frontend, making it a one-stop shop for your deployment needs.
+* **Technology:** **Render**
+* **Justification:**
+    * **Simplicity and Speed:** Render is a Platform-as-a-Service (PaaS) provider that simplify deployment to a `git push`. It handle the server infrastructure, allowing you to focus on your code.
+    * **Python Support:** Render has excellent, well-documented support for deploying FastAPI applications.
+    * **Free Tiers:** Render has free tiers are sufficient for hosting a hackathon prototype.
+    * **Note on SQLite:** While SQLite is perfect for development, some PaaS free tiers use ephemeral filesystems (which are deleted on restart). For the hackathon demo, this is usually fine, but Render's free tier offers persistent disk services, which makes it slightly more robust for deploying an app with SQLite.

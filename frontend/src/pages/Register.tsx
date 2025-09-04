@@ -1,6 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+
+interface PasswordRequirement {
+  text: string
+  test: (password: string) => boolean
+}
 
 const Register: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -11,6 +16,22 @@ const Register: React.FC = () => {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const passwordRequirements: PasswordRequirement[] = [
+    { text: 'At least 8 characters', test: (pwd) => pwd.length >= 8 },
+    { text: 'At least one uppercase letter', test: (pwd) => /[A-Z]/.test(pwd) },
+    { text: 'At least one lowercase letter', test: (pwd) => /[a-z]/.test(pwd) },
+    { text: 'At least one number', test: (pwd) => /\d/.test(pwd) },
+    { text: 'At least one special character', test: (pwd) => /[!@#$%^&*(),.?":{}|<>]/.test(pwd) },
+    { text: 'Passwords must match', test: (pwd) => pwd === formData.confirmPassword }
+  ]
+
+  const passwordValidation = useMemo(() => {
+    return passwordRequirements.map(req => ({
+      ...req,
+      isValid: req.test(formData.password)
+    }))
+  }, [formData.password, formData.confirmPassword, passwordRequirements])
   
   const { register } = useAuth()
   const navigate = useNavigate()
@@ -31,13 +52,10 @@ const Register: React.FC = () => {
       return
     }
 
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long')
-      return
-    }
-
-    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      setError('Password must contain at least one uppercase letter, one lowercase letter, and one digit')
+    // Check if all password requirements are met
+    const allRequirementsMet = passwordValidation.every(req => req.isValid)
+    if (!allRequirementsMet) {
+      setError('Password does not meet all requirements')
       return
     }
 
@@ -113,7 +131,7 @@ const Register: React.FC = () => {
               onChange={handleChange}
               required
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-              placeholder="Create a password (min. 8 chars, uppercase, lowercase, digit)"
+              placeholder="Create a password"
             />
           </div>
 
@@ -132,6 +150,32 @@ const Register: React.FC = () => {
               placeholder="Confirm your password"
             />
           </div>
+
+          {/* Password Requirements */}
+          {formData.password && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-700">Password requirements:</p>
+              <ul className="text-sm space-y-1">
+                {passwordValidation.map((requirement, index) => (
+                  <li
+                    key={index}
+                    className={`flex items-center space-x-2 ${
+                      requirement.isValid ? 'text-green-600' : 'text-red-500'
+                    }`}
+                  >
+                    <span className={`flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold ${
+                      requirement.isValid 
+                        ? 'bg-green-100 text-green-600' 
+                        : 'bg-red-100 text-red-500'
+                    }`}>
+                      {requirement.isValid ? '✓' : '×'}
+                    </span>
+                    <span>{requirement.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <button
             type="submit"

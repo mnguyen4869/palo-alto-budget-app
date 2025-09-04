@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react'
+import React, { type ReactNode } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -24,7 +24,32 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Link to="/" className="text-xl font-bold text-orange-600">
+              <Link to="/" className="flex items-center text-xl font-bold text-orange-600">
+                <svg 
+                  className="w-8 h-8 mr-3" 
+                  viewBox="0 0 32 32" 
+                  fill="none" 
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  {/* Orange square background */}
+                  <rect 
+                    x="2" 
+                    y="2" 
+                    width="28" 
+                    height="28" 
+                    rx="4" 
+                    fill="#EA580C"
+                  />
+                  {/* White curved chevron pointing to top right */}
+                  <path 
+                    d="M10 20Q15 8 18 12Q21 16 24 10" 
+                    stroke="white" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    fill="none"
+                  />
+                </svg>
                 Smart Financial Coach
               </Link>
             </div>
@@ -53,6 +78,26 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     Transactions
                   </Link>
                   <Link
+                    to="/subscriptions"
+                    className={`px-3 py-2 rounded-md text-sm font-medium ${
+                      isActive('/subscriptions')
+                        ? 'bg-orange-100 text-orange-700'
+                        : 'text-gray-700 hover:text-orange-600'
+                    }`}
+                  >
+                    Subscriptions
+                  </Link>
+                  <Link
+                    to="/insights"
+                    className={`px-3 py-2 rounded-md text-sm font-medium ${
+                      isActive('/insights')
+                        ? 'bg-orange-100 text-orange-700'
+                        : 'text-gray-700 hover:text-orange-600'
+                    }`}
+                  >
+                    Insights
+                  </Link>
+                  <Link
                     to="/goals"
                     className={`px-3 py-2 rounded-md text-sm font-medium ${
                       isActive('/goals')
@@ -72,15 +117,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   >
                     Settings
                   </Link>
-                  <div className="flex items-center space-x-3">
-                    <span className="text-sm text-gray-700">Hello, {user.name}</span>
-                    <button
-                      onClick={handleLogout}
-                      className="bg-red-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-red-700"
-                    >
-                      Logout
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="bg-red-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-red-700"
+                  >
+                    Logout
+                  </button>
                 </>
               ) : (
                 <>

@@ -23,8 +23,12 @@ class Transaction(SQLModel, table=True):
     user_id: int = Field(foreign_key="user.id")
     name: str
     price: Decimal
-    categories: list[str] | None = Field(sa_type=String)
-    merchant_name: str
+    category_primary: str | None = Field(default=None)  # Primary category from Plaid
+    category_detailed: str | None = Field(default=None)  # Detailed category from Plaid
+    category_confidence_level: str | None = Field(default=None)  # Confidence level from Plaid
+    category_icon_url: str | None = Field(default=None)  # Icon URL from Plaid
+    merchant_name: str | None = Field(default=None)
+    logo_url: str | None = Field(default=None)  # Merchant logo URL from Plaid
     date_of_transaction: date
     plaid_transaction_id: str | None = Field(default=None, unique=True)
     account_id: str | None = Field(default=None)
@@ -61,6 +65,7 @@ class BankAccount(SQLModel, table=True):
     account_subtype: str | None = Field(default=None)
     institution_name: str
     mask: str | None = Field(default=None)
+    access_token: str | None = Field(default=None)  # In production, this should be encrypted
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

@@ -1,3 +1,5 @@
 .agent-os/
 .claude/
 **/.venv/
+CLAUDE.md
+**/.env

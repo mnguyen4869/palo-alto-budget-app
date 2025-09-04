@@ -1,52 +1,64 @@
-import React, { useState, useEffect } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import React, { useState } from 'react'
+import { useBankAccounts, usePlaidSync } from '../hooks/useApi'
 import PlaidLink from './PlaidLink'
 
-interface BankAccount {
-  id: string
-  name: string
-  account_type: string
-  institution_name: string
-  is_active: boolean
-  created_at: string
-}
-
 const BankAccounts: React.FC = () => {
-  const { token } = useAuth()
-  const [accounts, setAccounts] = useState<BankAccount[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { accounts, loading, error, refetch, removeAccount } = useBankAccounts()
+  const { syncTransactions } = usePlaidSync()
+  const [syncing, setSyncing] = useState(false)
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
+  const [removingAccount, setRemovingAccount] = useState<string | null>(null)
 
-  const fetchAccounts = async () => {
+  const handlePlaidSuccess = async () => {
+    // Refetch accounts first
+    await refetch()
+    
+    // Auto-sync transactions after successful bank connection
     try {
-      const response = await fetch('http://localhost:8000/accounts', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setAccounts(data)
-      } else {
-        setError('Failed to fetch accounts')
-      }
+      setSyncing(true)
+      setSyncMessage('Syncing your transaction data...')
+      const result = await syncTransactions()
+      setSyncMessage(`Success! ${result.transaction_count || 0} transactions synced.`)
+      setTimeout(() => setSyncMessage(null), 5000)
     } catch (error) {
-      setError('Failed to fetch accounts')
+      setSyncMessage('Note: Transaction sync will be available after account setup is complete.')
+      setTimeout(() => setSyncMessage(null), 5000)
     } finally {
-      setLoading(false)
+      setSyncing(false)
     }
   }
 
-  useEffect(() => {
-    if (token) {
-      fetchAccounts()
+  const handleSyncTransactions = async () => {
+    try {
+      setSyncing(true)
+      setSyncMessage('Syncing transactions...')
+      const result = await syncTransactions()
+      setSyncMessage(`Success! ${result.transaction_count || 0} transactions synced.`)
+      setTimeout(() => setSyncMessage(null), 5000)
+    } catch (error: any) {
+      setSyncMessage(`Sync failed: ${error.message}`)
+      setTimeout(() => setSyncMessage(null), 5000)
+    } finally {
+      setSyncing(false)
     }
-  }, [token])
+  }
 
-  const handlePlaidSuccess = () => {
-    fetchAccounts()
+  const handleRemoveAccount = async (accountId: string, accountName: string) => {
+    if (!window.confirm(`Are you sure you want to disconnect "${accountName}"? This will remove access to transaction data from this account.`)) {
+      return
+    }
+
+    try {
+      setRemovingAccount(accountId)
+      await removeAccount(accountId)
+      setSyncMessage(`Successfully disconnected "${accountName}"`)
+      setTimeout(() => setSyncMessage(null), 5000)
+    } catch (error: any) {
+      setSyncMessage(`Failed to disconnect account: ${error.message}`)
+      setTimeout(() => setSyncMessage(null), 5000)
+    } finally {
+      setRemovingAccount(null)
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -91,15 +103,42 @@ const BankAccounts: React.FC = () => {
             Connect your bank accounts to automatically sync transactions
           </p>
         </div>
-        <PlaidLink
-          onSuccess={handlePlaidSuccess}
-          className="bg-orange-600 text-white px-4 py-2 rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
-        />
+        <div className="flex gap-2">
+          <PlaidLink
+            onSuccess={handlePlaidSuccess}
+            className="bg-orange-600 text-white px-4 py-2 rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+          />
+          {accounts.length > 0 && (
+            <button
+              onClick={handleSyncTransactions}
+              disabled={syncing}
+              className={`px-4 py-2 rounded-md font-medium text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                syncing 
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {syncing ? 'Syncing...' : 'Sync Transactions'}
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
         <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
           {error}
+        </div>
+      )}
+
+      {syncMessage && (
+        <div className={`mb-4 p-3 rounded ${
+          syncMessage.includes('Success') || syncMessage.includes('synced')
+            ? 'bg-green-100 border border-green-400 text-green-700'
+            : syncMessage.includes('failed') || syncMessage.includes('Sync failed')
+            ? 'bg-red-100 border border-red-400 text-red-700'
+            : 'bg-blue-100 border border-blue-400 text-blue-700'
+        }`}>
+          {syncMessage}
         </div>
       )}
 
@@ -141,7 +180,7 @@ const BankAccounts: React.FC = () => {
                 </div>
                 <div>
                   <div className="flex items-center space-x-2">
-                    <h4 className="font-medium text-gray-900">{account.name}</h4>
+                    <h4 className="font-medium text-gray-900">{account.account_name}</h4>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getAccountTypeColor(account.account_type)}`}>
                       {account.account_type}
                     </span>
@@ -151,7 +190,7 @@ const BankAccounts: React.FC = () => {
                 </div>
               </div>
               
-              <div className="flex items-center">
+              <div className="flex items-center space-x-3">
                 {account.is_active ? (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                     <svg className="w-1.5 h-1.5 mr-1" fill="currentColor" viewBox="0 0 8 8">
@@ -167,6 +206,27 @@ const BankAccounts: React.FC = () => {
                     Inactive
                   </span>
                 )}
+                
+                <button
+                  onClick={() => handleRemoveAccount(account.id, account.account_name)}
+                  disabled={removingAccount === account.id}
+                  className={`p-2 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ${
+                    removingAccount === account.id
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'text-red-600 hover:bg-red-50 hover:text-red-700'
+                  }`}
+                  title="Disconnect account"
+                >
+                  {removingAccount === account.id ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  )}
+                </button>
               </div>
             </div>
           ))}
@@ -179,7 +239,6 @@ const BankAccounts: React.FC = () => {
           <li>• Transactions are automatically synced and categorized</li>
           <li>• Your banking credentials are never stored on our servers</li>
           <li>• You can disconnect accounts at any time</li>
-          <li>• All data is encrypted with bank-level security</li>
         </ul>
       </div>
     </div>

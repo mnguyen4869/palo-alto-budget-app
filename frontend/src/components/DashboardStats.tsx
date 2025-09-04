@@ -1,13 +1,5 @@
 import React from 'react'
-
-interface Transaction {
-  id: string
-  name: string
-  price: number
-  categories: string[]
-  merchant_name: string
-  transaction_date: string
-}
+import type { Transaction } from '../types/transaction'
 
 interface Goal {
   id: string
@@ -26,21 +18,23 @@ interface DashboardStatsProps {
 
 const DashboardStats: React.FC<DashboardStatsProps> = ({ transactions, goals }) => {
   const calculateStats = () => {
-    const thisMonth = new Date()
-    thisMonth.setDate(1)
-    thisMonth.setHours(0, 0, 0, 0)
+    // Get last 30 days instead of just this calendar month
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    thirtyDaysAgo.setHours(0, 0, 0, 0)
 
-    const thisMonthTransactions = transactions.filter(t => 
-      new Date(t.transaction_date) >= thisMonth
+    const recentTransactions = transactions.filter(t => 
+      new Date(t.date_of_transaction) >= thirtyDaysAgo
     )
 
-    const totalSpent = thisMonthTransactions
-      .filter(t => t.price < 0)
-      .reduce((sum, t) => sum + Math.abs(t.price), 0)
+    // Expenses are positive amounts, income are negative amounts (Plaid API convention)
+    const totalSpent = recentTransactions
+      .filter(t => Number(t.price) > 0)
+      .reduce((sum, t) => sum + Number(t.price), 0)
 
-    const totalIncome = thisMonthTransactions
-      .filter(t => t.price > 0)
-      .reduce((sum, t) => sum + t.price, 0)
+    const totalIncome = recentTransactions
+      .filter(t => Number(t.price) < 0)
+      .reduce((sum, t) => sum + Math.abs(Number(t.price)), 0)
 
     const activeGoals = goals.filter(g => g.status === 'active').length
     const completedGoals = goals.filter(g => g.status === 'completed').length
@@ -58,7 +52,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ transactions, goals }) 
       activeGoals,
       completedGoals,
       avgGoalProgress: Math.round(avgGoalProgress * 10) / 10,
-      transactionCount: thisMonthTransactions.length
+      transactionCount: recentTransactions.length
     }
   }
 
@@ -84,9 +78,9 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ transactions, goals }) 
   )
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div className="grid grid-cols-1 gap-6">
       <StatCard
-        title="This Month Spending"
+        title="Last 30 Days Spending"
         value={`$${stats.totalSpent}`}
         color="bg-red-100"
         icon={
@@ -97,7 +91,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ transactions, goals }) 
       />
       
       <StatCard
-        title="This Month Income"
+        title="Last 30 Days Income"
         value={`$${stats.totalIncome}`}
         color="bg-green-100"
         icon={
@@ -114,17 +108,6 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ transactions, goals }) 
         icon={
           <svg className={`w-6 h-6 ${stats.netIncome >= 0 ? "text-green-600" : "text-red-600"}`} fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clipRule="evenodd" />
-          </svg>
-        }
-      />
-      
-      <StatCard
-        title="Active Goals"
-        value={`${stats.activeGoals} (${stats.avgGoalProgress}% avg)`}
-        color="bg-orange-100"
-        icon={
-          <svg className="w-6 h-6 text-orange-600" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
           </svg>
         }
       />

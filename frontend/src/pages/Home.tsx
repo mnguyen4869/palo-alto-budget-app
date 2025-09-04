@@ -82,7 +82,7 @@ const Home: React.FC = () => {
           </div>
           <h3 className="text-xl font-semibold mb-2">Security First</h3>
           <p className="text-gray-600">
-            Bank-level security with encrypted data and privacy-focused design
+            Automatically receives transaction data securely from Plaid with a privacy-focused design
           </p>
         </div>
       </div>

@@ -37,6 +37,7 @@ class GoalCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=500)
     target_amount: Decimal = Field(..., gt=0)
+    current_amount: Optional[Decimal] = Field(default=Decimal("0.00"), ge=0)
     target_date: Optional[date] = None
     
     @validator('target_date')
@@ -86,9 +87,16 @@ class TransactionResponse(BaseModel):
     user_id: int
     name: str
     price: Decimal
-    categories: Optional[list[str]]
+    category_primary: Optional[str]
+    category_detailed: Optional[str]
+    category_confidence_level: Optional[str]
+    category_icon_url: Optional[str]
     merchant_name: str
+    logo_url: Optional[str]
     date_of_transaction: date
     plaid_transaction_id: Optional[str]
     account_id: Optional[str]
     created_at: datetime
+    
+    class Config:
+        from_attributes = True

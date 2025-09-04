@@ -1,18 +1,61 @@
 import React from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { useTransactions, useGoals, useInsights } from '../hooks/useApi'
-import DashboardStats from '../components/DashboardStats'
-import SpendingChart from '../components/SpendingChart'
+import { useTransactions, useGoals, useInsights, useBankAccounts } from '../hooks/useApi'
+import NetIncomeChart from '../components/NetIncomeChart'
 import CategoryChart from '../components/CategoryChart'
+import IncomeStreams from '../components/IncomeStreams'
+import SubscriptionSummary from '../components/SubscriptionSummary'
+import GoalsSummary from '../components/GoalsSummary'
+import InsightsSummary from '../components/InsightsSummary'
 import PlaidLink from '../components/PlaidLink'
 
 const Dashboard: React.FC = () => {
-  const { user } = useAuth()
-  const { transactions, loading: transactionsLoading, error: transactionsError } = useTransactions()
+  const { user, token } = useAuth()
+  const { transactions, loading: transactionsLoading, error: transactionsError, setTransactions } = useTransactions()
   const { goals, loading: goalsLoading, error: goalsError } = useGoals()
-  const { insights, loading: insightsLoading, error: insightsError } = useInsights()
+  const { loading: insightsLoading, error: insightsError, setInsights } = useInsights()
+  const { accounts, loading: accountsLoading, refetch: refetchAccounts } = useBankAccounts()
 
-  if (transactionsLoading || goalsLoading || insightsLoading) {
+  const handlePlaidSuccess = async () => {
+    // Refresh accounts list
+    await refetchAccounts()
+    
+    // Refresh transactions data
+    try {
+      const response = await fetch('http://localhost:8000/transactions', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setTransactions(data)
+      }
+    } catch (error) {
+      console.error('Failed to refresh transactions:', error)
+    }
+
+    // Refresh insights data  
+    try {
+      const response = await fetch('http://localhost:8000/insights', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setInsights(data)
+      }
+    } catch (error) {
+      console.error('Failed to refresh insights:', error)
+    }
+  }
+
+  if (transactionsLoading || goalsLoading || insightsLoading || accountsLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
@@ -23,6 +66,24 @@ const Dashboard: React.FC = () => {
 
   return (
     <div>
+      {accounts.length === 0 && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+          <div className="flex justify-center mb-3">
+            <svg className="w-6 h-6 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-blue-800 mb-2">Get Started</h3>
+          <p className="text-sm text-blue-700 mb-4">
+            Connect your bank account to see personalized insights and track your spending automatically.
+          </p>
+          <PlaidLink
+            onSuccess={handlePlaidSuccess}
+            className="bg-orange-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors"
+          />
+        </div>
+      )}
+
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">
           Welcome back, {user?.name}!
@@ -32,54 +93,108 @@ const Dashboard: React.FC = () => {
         </p>
       </div>
 
-      <DashboardStats transactions={transactions} goals={goals} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Last 30 Days Spending */}
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="flex items-center">
+            <div className="bg-red-100 p-3 rounded-full">
+              <svg className="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Last 30 Days Spending</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                ${Math.round(transactions.filter(t => {
+                  const thirtyDaysAgo = new Date()
+                  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+                  return new Date(t.date_of_transaction) >= thirtyDaysAgo && Number(t.price) > 0
+                }).reduce((sum, t) => sum + Number(t.price), 0) * 100) / 100}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Last 30 Days Income */}
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="flex items-center">
+            <div className="bg-green-100 p-3 rounded-full">
+              <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Last 30 Days Income</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                ${Math.round(transactions.filter(t => {
+                  const thirtyDaysAgo = new Date()
+                  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+                  return new Date(t.date_of_transaction) >= thirtyDaysAgo && Number(t.price) < 0
+                }).reduce((sum, t) => sum + Math.abs(Number(t.price)), 0) * 100) / 100}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Net Income */}
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="flex items-center">
+            <div className={`p-3 rounded-full ${(() => {
+              const thirtyDaysAgo = new Date()
+              thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+              const recentTransactions = transactions.filter(t => new Date(t.date_of_transaction) >= thirtyDaysAgo)
+              const income = recentTransactions.filter(t => Number(t.price) < 0).reduce((sum, t) => sum + Math.abs(Number(t.price)), 0)
+              const spending = recentTransactions.filter(t => Number(t.price) > 0).reduce((sum, t) => sum + Number(t.price), 0)
+              const netIncome = income - spending
+              return netIncome >= 0 ? "bg-green-100" : "bg-red-100"
+            })()}`}>
+              <svg className={`w-6 h-6 ${(() => {
+                const thirtyDaysAgo = new Date()
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+                const recentTransactions = transactions.filter(t => new Date(t.date_of_transaction) >= thirtyDaysAgo)
+                const income = recentTransactions.filter(t => Number(t.price) < 0).reduce((sum, t) => sum + Math.abs(Number(t.price)), 0)
+                const spending = recentTransactions.filter(t => Number(t.price) > 0).reduce((sum, t) => sum + Number(t.price), 0)
+                const netIncome = income - spending
+                return netIncome >= 0 ? "text-green-600" : "text-red-600"
+              })()}`} fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Net Income</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                ${(() => {
+                  const thirtyDaysAgo = new Date()
+                  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+                  const recentTransactions = transactions.filter(t => new Date(t.date_of_transaction) >= thirtyDaysAgo)
+                  const income = recentTransactions.filter(t => Number(t.price) < 0).reduce((sum, t) => sum + Math.abs(Number(t.price)), 0)
+                  const spending = recentTransactions.filter(t => Number(t.price) > 0).reduce((sum, t) => sum + Number(t.price), 0)
+                  return Math.round((income - spending) * 100) / 100
+                })()}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <SpendingChart transactions={transactions} />
+        <div className="lg:col-span-2">
+          <NetIncomeChart transactions={transactions} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <CategoryChart transactions={transactions} />
       </div>
 
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
-          <svg className="w-5 h-5 text-orange-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-          </svg>
-          Recent Insights
-        </h3>
-        
-        {insights.length === 0 ? (
-          <div className="text-center py-6">
-            <p className="text-gray-500 mb-4">No insights available yet. Connect your bank account to get started!</p>
-            <PlaidLink
-              onSuccess={() => window.location.reload()}
-              className="bg-orange-600 text-white px-4 py-2 rounded-md font-medium hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
-            />
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {insights.slice(0, 5).map(insight => (
-              <div 
-                key={insight.id} 
-                className={`p-4 rounded-lg border-l-4 ${
-                  insight.confidence_score > 0.7 
-                    ? 'border-green-400 bg-green-50' 
-                    : 'border-yellow-400 bg-yellow-50'
-                }`}
-              >
-                <h4 className="font-medium text-gray-900">{insight.title}</h4>
-                <p className="text-gray-700 mt-1">{insight.message}</p>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs text-gray-500">
-                    {new Date(insight.created_at).toLocaleDateString()}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    Confidence: {Math.round(insight.confidence_score * 100)}%
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <IncomeStreams accounts={accounts} />
+        <GoalsSummary goals={goals} />
+        <SubscriptionSummary transactions={transactions} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <InsightsSummary />
       </div>
 
       {transactionsError && (

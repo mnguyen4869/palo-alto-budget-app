@@ -9,15 +9,7 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts'
-
-interface Transaction {
-  id: string
-  name: string
-  price: number
-  categories: string[]
-  merchant_name: string
-  transaction_date: string
-}
+import type { Transaction } from '../types/transaction'
 
 interface SpendingChartProps {
   transactions: Transaction[]
@@ -27,10 +19,13 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ transactions }) => {
   const processDataForChart = () => {
     const dailySpending: { [key: string]: number } = {}
     
-    transactions.forEach(transaction => {
-      const date = new Date(transaction.transaction_date).toLocaleDateString()
-      dailySpending[date] = (dailySpending[date] || 0) + Math.abs(transaction.price)
-    })
+    // Only include expenses (positive amounts) in spending chart
+    transactions
+      .filter(transaction => Number(transaction.price) > 0)
+      .forEach(transaction => {
+        const date = new Date(transaction.date_of_transaction).toLocaleDateString()
+        dailySpending[date] = (dailySpending[date] || 0) + Number(transaction.price)
+      })
 
     return Object.entries(dailySpending)
       .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
